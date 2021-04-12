@@ -5,7 +5,7 @@ import tensorflow as tf
 from tensorflow_addons.utils.keras_utils import LossFunctionWrapper
 from tensorflow_addons.utils.types import FloatTensorLike, TensorLike
 
-from utils import euclidean_distance, manhattan_distance
+from utils import euclidean_distance, manhattan_distance, get_most_frequent_label
 
 
 @tf.function

@@ -12,7 +12,29 @@ from keras.callbacks import ModelCheckpoint
 from keras.preprocessing.text import Tokenizer
 from tensorflow.keras.layers.experimental.preprocessing import StringLookup
 
+from model import TwoTowerModel
+from metric import PairTripletAccuracy
+from triplet import ConstrainedTripletLoss
 
+# A plotting function you can reuse
+def plot(history):
+  
+    # The history object contains results on the training and test
+    # sets for each epoch
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+
+    # Get the number of epochs
+    epochs = range(len(loss))
+
+    _ = plt.figure()
+    plt.title('Training and validation loss')
+    plt.plot(epochs, loss, color='blue', label='Train')
+    plt.plot(epochs, val_loss, color='orange', label='Val')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+  
 zf = zipfile.ZipFile('/content/drive/MyDrive/COMS4762_ML4G/Project/ML4FG_final_project/Dataset/CIRCLE_seq_data.zip') # having First.csv zipped file.
 print(zf.namelist())
 df_cut = pd.read_csv(zf.open('CIRCLE_seq_cut_5bp_flank.csv'))
@@ -136,24 +158,5 @@ history = model.fit(
     epochs=10,
     callbacks=[stop_early, save_best, tboard]
 )
-
-# A plotting function you can reuse
-def plot(history):
-  
-  # The history object contains results on the training and test
-  # sets for each epoch
-  loss = history.history['loss']
-  val_loss = history.history['val_loss']
-
-  # Get the number of epochs
-  epochs = range(len(loss))
-
-  _ = plt.figure()
-  plt.title('Training and validation loss')
-  plt.plot(epochs, loss, color='blue', label='Train')
-  plt.plot(epochs, val_loss, color='orange', label='Val')
-  plt.xlabel('Epoch')
-  plt.ylabel('Loss')
-  plt.legend()
   
 plot(history)
