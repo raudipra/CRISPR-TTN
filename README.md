@@ -24,7 +24,7 @@ Prepare the input file, preferably in CSV format. For training prepare a 3-colum
 ![Fig1](images/data_preprocess.png)
 
 #### Training
-Run `python3 train.py [input_file] [output_model_path]`
+Run `python3 train.py [input_path] [output_model_path]`
 
 #### Predict / Inference
-Run `python3 predict.py [input_file] [model_path] [output_path]`
+Run `python3 predict.py [input_path] [model_path] [output_path]`
