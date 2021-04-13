@@ -2,6 +2,7 @@ import sys
 
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from tensorflow.keras.models import load_model
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.layers.experimental.preprocessing import StringLookup
@@ -14,6 +15,7 @@ from data_loader import DataLoader
 
 # A plotting function you can reuse
 def plot(history):
+  
     # The history object contains results on the training and test
     # sets for each epoch
     loss = history.history['loss']
@@ -49,12 +51,13 @@ def preprocess(feature, label):
     return tf.concat([RNA_seq, sgRNA_seq], 0), label
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("usage: python train.py [input_path] [output_model_path]")
+    if len(sys.argv) < 4:
+        print("usage: python predict.py [input_path] [model_path] [output_path]")
         sys.exit()
     
     input_path = sys.argv[1]
     model_path = sys.argv[2]
+    output_path = sys.argv[2]
     data_loader = DataLoader(input_path, training_ratio=0.7)
 
     raw_train_ds, raw_val_ds = data_loader.load()
