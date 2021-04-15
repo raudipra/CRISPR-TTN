@@ -7,10 +7,37 @@ from tensorflow_addons.utils.types import FloatTensorLike, TensorLike
 
 from utils import euclidean_distance, manhattan_distance, get_most_frequent_label
 
+@tf.function
+def group_dist_mat_by_label(i, labels, dist_mat, grouped_dist):
+    idx = tf.squeeze(tf.where(tf.equal(labels, i)), axis=1)
+    probability = tf.zeros([tf.size(labels)], dtype=tf.float32) # batch size
+    updates = tf.fill(tf.shape(idx), tf.truediv(1.0, tf.cast(tf.size(idx), tf.float32)))
+    probability = tf.tensor_scatter_nd_update(probability, tf.expand_dims(idx, 1), updates)
+
+    # half of batch
+    num_triplet_pair_per_sample = tf.math.floordiv(tf.size(labels), 2)
+
+    triplet_pair_idx = tf.squeeze(
+        tf.random.categorical(
+            tf.math.log(tf.expand_dims(probability, 0)), 
+            num_triplet_pair_per_sample
+        ),
+        axis=0
+    )
+    triplet_pair = tf.squeeze(tf.gather(dist_mat, triplet_pair_idx), axis=1)
+    
+    if i == 0.0:
+        grouped_dist = tf.expand_dims(triplet_pair, axis=0)
+    else:
+        grouped_dist = tf.concat([grouped_dist, tf.expand_dims(triplet_pair, axis=0)], axis=0)
+    i = i + 1
+
+    return i, labels, dist_mat, grouped_dist
 
 @tf.function
-def constrained_triplet_loss_function(y_true: TensorLike, y_pred: TensorLike, 
-                                      margin: FloatTensorLike = 1.0, 
+def constrained_triplet_loss_function(y_true: TensorLike, y_pred: TensorLike,  
+                                      num_labels: int,
+                                      margin: FloatTensorLike = 1.0,
                                       distance_metric: Union[str, Callable] = "L2"):
     """
         Calculate triplet loss function of two embedding pairs `y_pred`. This function is 
@@ -46,66 +73,58 @@ def constrained_triplet_loss_function(y_true: TensorLike, y_pred: TensorLike,
             if convert_to_float32 else embeddings
     )
 
-    most_freq_label, max_freq, ndata = get_most_frequent_label(labels)
-    if max_freq == ndata:
-        print("Max freq == ndata: {}".format(max_freq))
-        print("Skip loss calculation")
-        return tf.cast(0.0, embeddings.dtype)
-
-    squeezed_labels = tf.squeeze(labels, axis=1, name='squeeze_label')
-    most_label_cond = tf.equal(squeezed_labels, most_freq_label)
-    least_label_cond = tf.logical_not(most_label_cond)
-    
-    most_label_item = tf.squeeze(tf.gather(precise_embeddings, 
-                                tf.where(most_label_cond)), 
-                                axis=1, name='squeeze_most_label')
-    least_label_item = tf.squeeze(tf.gather(precise_embeddings,
-                                  tf.where(least_label_cond)),
-                                  axis=1, name='squeeze_least_label')
+    labels = tf.squeeze(labels, axis=1)
     
     if distance_metric == "L2":
-        dist_most_label = euclidean_distance(most_label_item[:, 0], 
-                                             most_label_item[:, 1])
-        dist_least_label = euclidean_distance(least_label_item[:, 0], 
-                                              least_label_item[:, 1])
+        dist_mat = euclidean_distance(precise_embeddings[:, 0], 
+                                      precise_embeddings[:, 1])
     elif distance_metric == "squared-L2":
-        dist_most_label = tf.square(euclidean_distance(most_label_item[:, 0], 
-                                                       most_label_item[:, 1]))
-        dist_least_label = tf.square(euclidean_distance(least_label_item[:, 0], 
-                                                        least_label_item[:, 1]))
+        dist_mat = tf.square(euclidean_distance(precise_embeddings[:, 0], 
+                                                precise_embeddings[:, 1]))
     elif distance_metric == "L1":
-        dist_most_label = manhattan_distance(most_label_item[:, 0], 
-                                             most_label_item[:, 1])
-        dist_least_label = manhattan_distance(least_label_item[:, 0], 
-                                              least_label_item[:, 1])
+        dist_mat = manhattan_distance(precise_embeddings[:, 0], 
+                                      precise_embeddings[:, 1])
     else: # Callable
-        dist_most_label = distance_metric(most_label_item[:, 0], 
-                                             most_label_item[:, 1])
-        dist_least_label = distance_metric(least_label_item[:, 0], 
-                                              least_label_item[:, 1])
+        dist_mat = distance_metric(precise_embeddings[:, 0], 
+                                   precise_embeddings[:, 1])
 
-    # Generate pair counterparts for dist_most_label from dist_least_label.
-    least_label_idx = tf.random.uniform([max_freq], minval=0, 
-                                        maxval=ndata - max_freq - 1, 
-                                        dtype=tf.dtypes.int32)
+    # make it even for cut and non cut pairs
+    num_labels += num_labels % 2
+
+    condition = lambda i, labels, dist_mat, grouped_dist: i < num_labels
+
+    i = tf.constant(0.)
+    grouped_dist = tf.convert_to_tensor([[]], name="grouped_dist")
+    __, __, __, grouped_dist = tf.while_loop(
+        condition, group_dist_mat_by_label, 
+        loop_vars=[i, labels, dist_mat, grouped_dist],
+        shape_invariants=[i.get_shape(), labels.get_shape(), 
+                         dist_mat.get_shape(), tf.TensorShape([None, None])]
+    )
+
+    cut_dist_mat = grouped_dist[1::2]
+    noncut_dist_mat = grouped_dist[::2]
     
-    dist_pair = tf.gather(dist_least_label, least_label_idx)
+    # check if all zeros, meaning missing label
+    cut_dist_total = tf.reduce_sum(tf.abs(cut_dist_mat), axis=1)
+    is_valid_cut_pairs = tf.not_equal(cut_dist_total, 0.0)
+    noncut_dist_total = tf.reduce_sum(tf.abs(noncut_dist_mat), axis=1)
+    is_valid_noncut_pairs = tf.not_equal(noncut_dist_total, 0.0)
+
+    # if one index has all zeros value in either cut or noncut, 
+    # then remove the counterpart pair as well
+    is_valid_pairs = tf.math.logical_and(is_valid_cut_pairs, is_valid_noncut_pairs)
+    valid_idx = tf.squeeze(tf.where(is_valid_pairs), axis=1)
+    cut_dist_mat = tf.squeeze(tf.gather(cut_dist_mat, valid_idx))
+    noncut_dist_mat = tf.squeeze(tf.gather(noncut_dist_mat, valid_idx))
     
     # Cut label
-    if tf.cast(most_freq_label, tf.dtypes.int32) % 2 == 1:
-        triplet_loss = tf.math.truediv(
-            tf.math.reduce_sum(
-                tf.math.maximum(dist_most_label - dist_pair + margin, 0.0)
-            ),
-            tf.cast(max_freq, tf.dtypes.float32),
-        )
-    else: # Non cut label
-        triplet_loss = tf.math.truediv(
-            tf.math.reduce_sum(
-                tf.math.maximum(dist_pair - dist_most_label + margin, 0.0)
-            ),
-            tf.cast(max_freq, tf.dtypes.float32),
-        )
+    triplet_loss = tf.math.truediv(
+        tf.math.reduce_sum(
+            tf.math.maximum(cut_dist_mat - noncut_dist_mat + margin, 0.0)
+        ),
+        tf.cast(tf.size(cut_dist_mat), tf.dtypes.float32),
+    )
     
     if convert_to_float32:
         return tf.cast(triplet_loss, embeddings.dtype)
@@ -120,6 +139,7 @@ class ConstrainedTripletLoss(LossFunctionWrapper):
     @typechecked
     def __init__(
         self,
+        num_labels: int,
         margin: FloatTensorLike = 1.0, 
         distance_metric: Union[str, Callable] = "L2",
         name: Optional[str] = None,
@@ -128,6 +148,7 @@ class ConstrainedTripletLoss(LossFunctionWrapper):
         super().__init__(
             constrained_triplet_loss_function,
             name=name,
+            num_labels=num_labels,
             margin=margin,
             distance_metric=distance_metric,
         )

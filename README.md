@@ -32,4 +32,3 @@ Run `python3 predict.py [input_path] [model_path] [output_path]`
 ### TBD
 - predict.py
 - Weighted loss on additional feature 'read'
-- Optimize pair generation

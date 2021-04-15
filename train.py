@@ -85,7 +85,7 @@ if __name__ == "__main__":
 
     model.compile(
         optimizer=tf.keras.optimizers.Adam(),
-        loss=ConstrainedTripletLoss(),
+        loss=ConstrainedTripletLoss(num_labels=2),
         metrics=[PairTripletAccuracy()]
     )
 
