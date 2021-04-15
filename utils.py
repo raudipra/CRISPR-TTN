@@ -4,9 +4,11 @@ import tensorflow as tf
 def get_most_frequent_label(samples):
     samples = tf.squeeze(samples, axis=1)
     unique, _, count = tf.unique_with_counts(samples)
+    max_freq = tf.reduce_max(count)
     max_idx = tf.math.argmax(count)
+    ndata = tf.reduce_sum(count)
     
-    return unique[max_idx], count[max_idx]
+    return unique[max_idx], max_freq, ndata
     
 def euclidean_distance(x, y):
     dist = tf.square(x - y)

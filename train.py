@@ -44,9 +44,9 @@ def one_hot(sequence):
     return one_hot_matrix[:, 1:]
 
 def preprocess(feature, label):
-    RNA_seq = one_hot(feature[0])
-    sgRNA_seq = one_hot(feature[1])
-    return tf.concat([RNA_seq, sgRNA_seq], 0), label
+    rna_seq = one_hot(feature[0])
+    sgrna_seq = one_hot(feature[1])
+    return tf.concat([rna_seq, sgrna_seq], 0), label
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     string_lookup = StringLookup(vocabulary=VOCAB)
 
     AUTOTUNE = tf.data.experimental.AUTOTUNE
-    BATCH_SIZE = 256
+    BATCH_SIZE = 512
     SHUFFLE_SIZE = 1000
 
     encoded_train_ds = raw_train_ds.cache().shuffle(SHUFFLE_SIZE)
@@ -76,8 +76,11 @@ if __name__ == "__main__":
     train_ds = train_ds.prefetch(buffer_size=AUTOTUNE)
     val_ds = encoded_val_ds.cache().batch(BATCH_SIZE)
 
-    model = TwoTowerModel(RNA_length=33, gRNA_length=23)
-    model.build((None, 56, 4))
+    rna_length = data_loader.get_rna_length()
+    grna_length = data_loader.get_grna_length()
+
+    model = TwoTowerModel(rna_length=rna_length, grna_length=grna_length)
+    model.build((None, rna_length + grna_length, 4))
     print(model.summary())
 
     model.compile(
@@ -87,7 +90,7 @@ if __name__ == "__main__":
     )
 
     stop_early = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=10)
-    save_best = ModelCheckpoint(model_path, monitor='val_custom_accuracy', 
+    save_best = ModelCheckpoint(model_path, monitor='val_loss', 
                                 mode='max', verbose=1, save_best_only=True)
 
     history = model.fit(

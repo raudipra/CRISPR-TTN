@@ -46,8 +46,11 @@ def constrained_triplet_loss_function(y_true: TensorLike, y_pred: TensorLike,
             if convert_to_float32 else embeddings
     )
 
-    most_freq_label, max_freq = get_most_frequent_label(labels)
-    ndata = labels.shape[0]
+    most_freq_label, max_freq, ndata = get_most_frequent_label(labels)
+    if max_freq == ndata:
+        print("Max freq == ndata: {}".format(max_freq))
+        print("Skip loss calculation")
+        return tf.cast(0.0, embeddings.dtype)
 
     squeezed_labels = tf.squeeze(labels, axis=1, name='squeeze_label')
     most_label_cond = tf.equal(squeezed_labels, most_freq_label)
@@ -83,12 +86,13 @@ def constrained_triplet_loss_function(y_true: TensorLike, y_pred: TensorLike,
 
     # Generate pair counterparts for dist_most_label from dist_least_label.
     least_label_idx = tf.random.uniform([max_freq], minval=0, 
-                                        maxval=(ndata - max_freq - 1), 
+                                        maxval=ndata - max_freq - 1, 
                                         dtype=tf.dtypes.int32)
+    
     dist_pair = tf.gather(dist_least_label, least_label_idx)
     
     # Cut label
-    if tf.cast(most_freq_label, tf.dtypes.int32):
+    if tf.cast(most_freq_label, tf.dtypes.int32) % 2 == 1:
         triplet_loss = tf.math.truediv(
             tf.math.reduce_sum(
                 tf.math.maximum(dist_most_label - dist_pair + margin, 0.0)
@@ -122,7 +126,7 @@ class ConstrainedTripletLoss(LossFunctionWrapper):
         **kwargs,
     ):
         super().__init__(
-            triplet_loss_function,
+            constrained_triplet_loss_function,
             name=name,
             margin=margin,
             distance_metric=distance_metric,

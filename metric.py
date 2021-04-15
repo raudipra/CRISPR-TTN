@@ -58,7 +58,7 @@ def pair_triplet_accuracy(y_true: TensorLike, y_pred: TensorLike,
                                precise_embeddings[:, 1])
         
     labels_pred = dist <= margin
-
+    
     return math_ops.cast(math_ops.equal(
         tf.cast(y_true, tf.dtypes.bool), labels_pred), K.floatx()
     )
