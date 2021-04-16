@@ -15,13 +15,23 @@ class DataLoader():
     def __init__(self, input_path, training_ratio=0.7):
         self.input_path = input_path
         self.training_ratio = training_ratio
+        self.grnas = np.array([])
 
     def load(self):
         df = pd.read_csv(self.input_path)
         dataset = df[['rna', 'grna', 'label']].values
 
-        np.random.seed(42) 
+        np.random.seed(42)
         np.random.shuffle(dataset)
+
+        # Fix the label into 2 x unique grna (cut and non cut) 
+        # self.grnas = [2]
+        self.grnas = np.unique(dataset[:, 1])
+
+        dataset[:, 2] = np.array([
+            (np.where(self.grnas == grna)[0][0] * 2 + label) \
+                for grna, label in zip(dataset[:, 1], dataset[:, -1])
+        ])
 
         X = dataset[:, :2]
         y = dataset[:, -1]
@@ -77,6 +87,11 @@ class DataLoader():
         if self.grna_length == None:
             print("Error: grna_length is missing. Run DataLoader.load() to generate it.")
         return self.grna_length
+
+    def get_num_labels(self):
+        if not len(self.grnas):
+            print("Error: grnas is missing. Run DataLoader.load() to generate it.")
+        return len(self.grnas) * 2
 
     # Output it as a ragged type, because we want to 
     # preprocess it through tf.Dataset map built-in.

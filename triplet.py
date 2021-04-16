@@ -9,14 +9,24 @@ from utils import euclidean_distance, manhattan_distance, get_most_frequent_labe
 
 @tf.function
 def group_dist_mat_by_label(i, labels, dist_mat, grouped_dist):
+    # half of batch
+    num_triplet_pair_per_sample = tf.math.floordiv(tf.size(labels), 2)
     idx = tf.squeeze(tf.where(tf.equal(labels, i)), axis=1)
+
+    if tf.shape(idx)[0] == 0:
+        if i == 0.:
+            grouped_dist = tf.zeros((1, num_triplet_pair_per_sample))
+        else:
+            grouped_dist = tf.concat([grouped_dist, tf.zeros((1, num_triplet_pair_per_sample))], axis=0)
+        
+        i = i + 1
+        return i, labels, dist_mat, grouped_dist
+
     probability = tf.zeros([tf.size(labels)], dtype=tf.float32) # batch size
     updates = tf.fill(tf.shape(idx), tf.truediv(1.0, tf.cast(tf.size(idx), tf.float32)))
     probability = tf.tensor_scatter_nd_update(probability, tf.expand_dims(idx, 1), updates)
 
-    # half of batch
-    num_triplet_pair_per_sample = tf.math.floordiv(tf.size(labels), 2)
-
+    probability
     triplet_pair_idx = tf.squeeze(
         tf.random.categorical(
             tf.math.log(tf.expand_dims(probability, 0)), 
@@ -24,14 +34,16 @@ def group_dist_mat_by_label(i, labels, dist_mat, grouped_dist):
         ),
         axis=0
     )
-    triplet_pair = tf.squeeze(tf.gather(dist_mat, triplet_pair_idx), axis=1)
     
-    if i == 0.0:
+    triplet_pair = tf.squeeze(tf.gather(dist_mat, triplet_pair_idx, name="triplet_pair_gather"), axis=1)
+   
+    if i == 0.:
         grouped_dist = tf.expand_dims(triplet_pair, axis=0)
     else:
         grouped_dist = tf.concat([grouped_dist, tf.expand_dims(triplet_pair, axis=0)], axis=0)
+    
     i = i + 1
-
+    
     return i, labels, dist_mat, grouped_dist
 
 @tf.function
@@ -60,7 +72,6 @@ def constrained_triplet_loss_function(y_true: TensorLike, y_pred: TensorLike,
         Returns:
             triplet_loss: float scalar with dtype of `y_pred`.
     """
-
     labels = tf.convert_to_tensor(y_true, name="labels")
     embeddings = tf.convert_to_tensor(y_pred, name="embeddings")
     
@@ -88,7 +99,7 @@ def constrained_triplet_loss_function(y_true: TensorLike, y_pred: TensorLike,
         dist_mat = distance_metric(precise_embeddings[:, 0], 
                                    precise_embeddings[:, 1])
 
-    # make it even for cut and non cut pairs
+    # make it even for cut and non cut pairs, because why not?
     num_labels += num_labels % 2
 
     condition = lambda i, labels, dist_mat, grouped_dist: i < num_labels
@@ -115,8 +126,8 @@ def constrained_triplet_loss_function(y_true: TensorLike, y_pred: TensorLike,
     # then remove the counterpart pair as well
     is_valid_pairs = tf.math.logical_and(is_valid_cut_pairs, is_valid_noncut_pairs)
     valid_idx = tf.squeeze(tf.where(is_valid_pairs), axis=1)
-    cut_dist_mat = tf.squeeze(tf.gather(cut_dist_mat, valid_idx))
-    noncut_dist_mat = tf.squeeze(tf.gather(noncut_dist_mat, valid_idx))
+    cut_dist_mat = tf.squeeze(tf.gather(cut_dist_mat, valid_idx, name="gather_cut_dist_mat"))
+    noncut_dist_mat = tf.squeeze(tf.gather(noncut_dist_mat, valid_idx, name="gather_noncut_dist_mat"))
     
     # Cut label
     triplet_loss = tf.math.truediv(

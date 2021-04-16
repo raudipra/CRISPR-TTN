@@ -60,7 +60,7 @@ def pair_triplet_accuracy(y_true: TensorLike, y_pred: TensorLike,
     labels_pred = dist <= margin
     
     return math_ops.cast(math_ops.equal(
-        tf.cast(y_true, tf.dtypes.bool), labels_pred), K.floatx()
+        tf.cast(tf.math.floormod(y_true, 2), tf.dtypes.bool), labels_pred), K.floatx()
     )
   
 class PairTripletAccuracy(MeanMetricWrapper):

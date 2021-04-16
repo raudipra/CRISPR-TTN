@@ -64,7 +64,7 @@ if __name__ == "__main__":
     string_lookup = StringLookup(vocabulary=VOCAB)
 
     AUTOTUNE = tf.data.experimental.AUTOTUNE
-    BATCH_SIZE = 512
+    BATCH_SIZE = 256
     SHUFFLE_SIZE = 1000
 
     encoded_train_ds = raw_train_ds.cache().shuffle(SHUFFLE_SIZE)
@@ -83,9 +83,10 @@ if __name__ == "__main__":
     model.build((None, rna_length + grna_length, 4))
     print(model.summary())
 
+    num_labels = data_loader.get_num_labels()
     model.compile(
         optimizer=tf.keras.optimizers.Adam(),
-        loss=ConstrainedTripletLoss(num_labels=2),
+        loss=ConstrainedTripletLoss(num_labels=num_labels),
         metrics=[PairTripletAccuracy()]
     )
 
