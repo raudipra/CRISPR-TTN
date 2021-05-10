@@ -5,7 +5,7 @@ import tensorflow as tf
 from tensorflow_addons.utils.keras_utils import LossFunctionWrapper
 from tensorflow_addons.utils.types import FloatTensorLike, TensorLike
 
-from utils import euclidean_distance, manhattan_distance, get_most_frequent_label
+from utils import euclidean_distance, manhattan_distance
 
 @tf.function
 def group_dist_mat_by_label(i, labels, dist_mat, grouped_dist):
@@ -85,7 +85,7 @@ def constrained_triplet_loss_function(y_true: TensorLike, y_pred: TensorLike,
     )
 
     labels = tf.squeeze(labels, axis=1)
-    
+      
     if distance_metric == "L2":
         dist_mat = euclidean_distance(precise_embeddings[:, 0], 
                                       precise_embeddings[:, 1])
@@ -98,7 +98,7 @@ def constrained_triplet_loss_function(y_true: TensorLike, y_pred: TensorLike,
     else: # Callable
         dist_mat = distance_metric(precise_embeddings[:, 0], 
                                    precise_embeddings[:, 1])
-
+    
     # make it even for cut and non cut pairs, because why not?
     num_labels += num_labels % 2
 
@@ -121,7 +121,7 @@ def constrained_triplet_loss_function(y_true: TensorLike, y_pred: TensorLike,
     is_valid_cut_pairs = tf.not_equal(cut_dist_total, 0.0)
     noncut_dist_total = tf.reduce_sum(tf.abs(noncut_dist_mat), axis=1)
     is_valid_noncut_pairs = tf.not_equal(noncut_dist_total, 0.0)
-
+    
     # if one index has all zeros value in either cut or noncut, 
     # then remove the counterpart pair as well
     is_valid_pairs = tf.math.logical_and(is_valid_cut_pairs, is_valid_noncut_pairs)

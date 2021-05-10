@@ -13,7 +13,7 @@ from data_loader import DataLoader
 
 
 # A plotting function you can reuse
-def plot(history):
+def plot_loss(history):
     # The history object contains results on the training and test
     # sets for each epoch
     loss = history.history['loss']
@@ -28,6 +28,23 @@ def plot(history):
     plt.plot(epochs, val_loss, color='orange', label='Val')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
+    plt.legend()
+
+def plot_acc(history):
+    # The history object contains results on the training and test
+    # sets for each epoch
+    acc = history.history['pair_triplet_accuracy']
+    val_acc = history.history['val_pair_triplet_accuracy']
+
+    # Get the number of epochs
+    epochs = range(len(acc))
+
+    _ = plt.figure()
+    plt.title('Training and validation accuracy')
+    plt.plot(epochs, acc, color='blue', label='Train')
+    plt.plot(epochs, val_acc, color='orange', label='Val')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
     plt.legend()
 
 @tf.function

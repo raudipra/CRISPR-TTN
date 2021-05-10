@@ -20,37 +20,35 @@ class TwoTowerModel(tf.keras.Model):
             tf.keras.layers.Conv1D(filters=32, kernel_size=3, padding='valid', 
                                    activation='relu', name="rna_conv_1",
                                    input_shape=(self.rna_length, 4)),
-            tf.keras.layers.MaxPooling1D(pool_size=2, name="rna_max_pool_1"),
-            tf.keras.layers.Dropout(0.3),
             tf.keras.layers.Conv1D(filters=64, kernel_size=3, padding='valid', 
                                    activation='relu', name="rna_conv_2"),
-            tf.keras.layers.MaxPooling1D(pool_size=2, name="rna_max_pool_2"),
-            tf.keras.layers.Dropout(0.3),
+            tf.keras.layers.Conv1D(filters=128, kernel_size=3, padding='valid', 
+                                   activation='relu', name="rna_conv_3"),
+            tf.keras.layers.MaxPooling1D(pool_size=2, name="rna_max_pool_1"),
+            tf.keras.layers.Dropout(0.2),
             tf.keras.layers.Flatten(),
             tf.keras.layers.Dense(self.embedding_dim, activation=None, 
                                   name="rna_dense_1"), # No activation on final dense layer
             tf.keras.layers.Lambda(lambda x: tf.math.l2_normalize(x, axis=1)) # L2 normalize embeddings
         ], name="rna_sequential")
         print(self.rna_encoder.summary())
-
+        
         self.grna_encoder = tf.keras.Sequential([
             # Shape of second dimension comes from the number of nucleotides
             tf.keras.layers.Conv1D(filters=32, kernel_size=3, padding='valid', 
-                                   activation='relu', name="g_rna_conv_1",
+                                   activation='relu', name="grna_conv_1",
                                    input_shape=(self.grna_length, 4)),
-            tf.keras.layers.MaxPooling1D(pool_size=2, name="g_rna_max_pool_1"),
-            tf.keras.layers.Dropout(0.3),
             tf.keras.layers.Conv1D(filters=64, kernel_size=3, padding='valid', 
-                                   activation='relu', name="g_rna_conv_2"),
-            tf.keras.layers.MaxPooling1D(pool_size=2, name="g_rna_max_pool_2"),
-            tf.keras.layers.Dropout(0.3),
+                                   activation='relu', name="grna_conv_2"),
+            tf.keras.layers.MaxPooling1D(pool_size=2, name="grna_max_pool_1"),
+            tf.keras.layers.Dropout(0.2),
             tf.keras.layers.Flatten(),
             tf.keras.layers.Dense(self.embedding_dim, activation=None, 
-                                  name="g_rna_dense_1"), # No activation on final dense layer
+                                  name="grna_dense_1"), # No activation on final dense layer
             tf.keras.layers.Lambda(lambda x: tf.math.l2_normalize(x, axis=1)) # L2 normalize embeddings
-        ], name="g_rna_sequential")
+        ], name="grna_sequential")
         print(self.grna_encoder.summary())
-    
+            
     def call(self, inputs):
         """
             Args:
