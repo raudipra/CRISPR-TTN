@@ -4,13 +4,18 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.preprocessing.text import Tokenizer
-from tensorflow.keras.layers.experimental.preprocessing import StringLookup
 
 from model import TwoTowerModel
 from metric import PairTripletAccuracy
 from triplet import ConstrainedTripletLoss
 from data_loader import DataLoader
+from utils import one_hot
 
+
+def preprocess(feature, label):
+    RNA_seq = one_hot(feature[0])
+    sgRNA_seq = one_hot(feature[1])
+    return tf.concat([RNA_seq, sgRNA_seq], 0), label
 
 # A plotting function you can reuse
 def plot_loss(history):
@@ -47,23 +52,6 @@ def plot_acc(history):
     plt.ylabel('Accuracy')
     plt.legend()
 
-@tf.function
-def one_hot(sequence):
-    sequence = string_lookup(sequence)
-    C = tf.constant(5)
-    one_hot_matrix = tf.one_hot(
-        sequence,
-        C,
-        on_value=1.0,
-        off_value=0.0,
-        axis =-1
-    )
-    return one_hot_matrix[:, 1:]
-
-def preprocess(feature, label):
-    rna_seq = one_hot(feature[0])
-    sgrna_seq = one_hot(feature[1])
-    return tf.concat([rna_seq, sgrna_seq], 0), label
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
@@ -72,22 +60,17 @@ if __name__ == "__main__":
     
     input_path = sys.argv[1]
     model_path = sys.argv[2]
-    data_loader = DataLoader(input_path, training_ratio=0.7)
+    data_loader = DataLoader(input_path, training_ratio=0.6)
 
     raw_train_ds, raw_val_ds = data_loader.load()
 
-    # Why N? for one encoding purpose, last character = [0, 0, 0, 0]
-    VOCAB = ["A", "G", "T", "N"]
-    string_lookup = StringLookup(vocabulary=VOCAB)
-
     AUTOTUNE = tf.data.experimental.AUTOTUNE
-    BATCH_SIZE = 256
-    SHUFFLE_SIZE = 1000
+    BATCH_SIZE = 2048
+    SHUFFLE_SIZE = 10000
 
-    encoded_train_ds = raw_train_ds.cache().shuffle(SHUFFLE_SIZE)
-    encoded_train_ds = encoded_train_ds.prefetch(buffer_size=AUTOTUNE)
+    encoded_train_ds = raw_train_ds.shuffle(SHUFFLE_SIZE)
     encoded_train_ds = encoded_train_ds.map(preprocess)
-    encoded_val_ds = raw_val_ds.cache().map(preprocess)
+    encoded_val_ds = raw_val_ds.map(preprocess)
 
     train_ds = encoded_train_ds.cache().batch(BATCH_SIZE)
     train_ds = train_ds.prefetch(buffer_size=AUTOTUNE)
@@ -109,7 +92,7 @@ if __name__ == "__main__":
 
     stop_early = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=10)
     save_best = ModelCheckpoint(model_path, monitor='val_loss', 
-                                mode='max', verbose=1, save_best_only=True)
+                                mode='min', verbose=1, save_best_only=True)
 
     history = model.fit(
         train_ds,

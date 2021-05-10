@@ -17,15 +17,40 @@ class DataLoader():
         self.training_ratio = training_ratio
         self.grnas = np.array([])
 
+    def load_test_set(self):
+        df = pd.read_csv(self.input_path)
+        
+        X = df[['rna', 'grna']].values
+        
+        # Fix the label into 2 x unique grna (cut and non cut) 
+        self.grnas = np.unique(X[:, 1])
+
+        if X.shape[0]:
+            self.rna_length = len(X[0][0])
+            self.grna_length = len(X[0][1])
+        
+        # Tokenize every nucleotides
+        tokenize = lambda x: [np.array([c for c in x[0]]), 
+                              np.array([c for c in x[1]])]
+        self.test = np.apply_along_axis(tokenize, 1, X)
+
+        raw_test_ds = tf.data.Dataset.from_generator(
+            self.gen_test,
+            output_signature=(
+                tf.RaggedTensorSpec(shape=(2, None), dtype=tf.string)
+            )
+        )
+
+        return raw_test_ds
+
     def load(self):
         df = pd.read_csv(self.input_path)
+        
         dataset = df[['rna', 'grna', 'label']].values
-
         np.random.seed(42)
         np.random.shuffle(dataset)
 
         # Fix the label into 2 x unique grna (cut and non cut) 
-        # self.grnas = [2]
         self.grnas = np.unique(dataset[:, 1])
 
         dataset[:, 2] = np.array([
@@ -106,3 +131,9 @@ class DataLoader():
         for idx, row in enumerate(self.val):
             feature = tf.ragged.constant([row[0].tolist(), row[1].tolist()])
             yield feature, row[2]
+
+    def gen_test(self):
+        np.random.shuffle(self.test)
+        for idx, row in enumerate(self.test):
+            feature = tf.ragged.constant([row[0].tolist(), row[1].tolist()])
+            yield feature
