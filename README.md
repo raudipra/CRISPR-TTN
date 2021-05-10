@@ -27,8 +27,4 @@ Prepare the input file, preferably in CSV format. For training prepare a 3-colum
 Run `python3 train.py [input_path] [output_model_path]`
 
 #### Predict / Inference
-Run `python3 predict.py [input_path] [model_path] [output_path]`
-
-### TBD
-- predict.py
-- Weighted loss on additional feature 'read'
+Run `python3 predict.py [input_path] [model_path] [output_path]
